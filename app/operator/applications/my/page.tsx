@@ -1,0 +1,342 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2, Pencil, Upload, FileText, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/hooks/use-auth"
+import { ApplicationStatus } from "@/types/database" // Ensure this type is exported or redefine
+
+type Application = {
+    id: string
+    application_no: string
+    applicant_name: string
+    service_name: string
+    created_at: string
+    accepted_at: string | null
+    status: ApplicationStatus
+    price: number | null
+    operator_price: number | null // Added
+    document_url?: string | null
+}
+
+export default function MyApplicationsPage() {
+    const [applications, setApplications] = useState<Application[]>([])
+    const [loading, setLoading] = useState(true)
+    const [selectedApp, setSelectedApp] = useState<Application | null>(null)
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+
+    // Form State
+    const [status, setStatus] = useState<ApplicationStatus>("under_review")
+    const [file, setFile] = useState<File | null>(null)
+
+    const { toast } = useToast()
+    const { user } = useAuth()
+
+    const fetchApplications = async () => {
+        if (!user) return
+
+        try {
+            setLoading(true)
+            const { data, error } = await supabase
+                .from('applications')
+                .select('*')
+                .eq('operator_id', user.id)
+                .order('accepted_at', { ascending: false })
+
+            if (error) throw error
+
+            setApplications(data || [])
+        } catch (error) {
+            console.error("Error fetching my apps:", error)
+            toast({
+                title: "Error",
+                description: "Failed to load your applications.",
+                variant: "destructive"
+            })
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchApplications()
+    }, [user])
+
+    const handleEditClick = (app: Application) => {
+        setSelectedApp(app)
+        setStatus(app.status)
+        setFile(null)
+        setIsDialogOpen(true)
+    }
+
+    const handleSave = async () => {
+        if (!selectedApp) return
+        setIsSaving(true)
+
+        try {
+            let publicUrl = selectedApp.document_url
+
+            // 1. Upload File if selected
+            if (file) {
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${selectedApp.id}-${Math.random().toString(36).substring(2)}.${fileExt}`
+                const filePath = `${fileName}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('documents')
+                    .upload(filePath, file)
+
+                if (uploadError) throw uploadError
+
+                const { data: urlData } = supabase.storage
+                    .from('documents')
+                    .getPublicUrl(filePath)
+
+                publicUrl = urlData.publicUrl
+            }
+
+            // 2. Update Application Record
+            const { error: updateError } = await (supabase.from('applications') as any)
+                .update({
+                    status: status,
+                    document_url: publicUrl,
+                    // If marking as completed and wasn't before? Optional logic.
+                })
+                .eq('id', selectedApp.id)
+
+            if (updateError) throw updateError
+
+            // 3. Update Local State
+            setApplications(prev => prev.map(app =>
+                app.id === selectedApp.id
+                    ? { ...app, status: status, document_url: publicUrl }
+                    : app
+            ))
+
+            setIsDialogOpen(false)
+            toast({
+                title: "Application Updated",
+                description: `Application updated successfully.`,
+            })
+
+        } catch (error) {
+            console.error("Error updating application:", error)
+            toast({
+                title: "Update Failed",
+                description: "There was an error updating the task.",
+                variant: "destructive"
+            })
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case "completed":
+            case "approved":
+                return <Badge className="bg-green-100 text-green-700 hover:bg-green-200">Completed</Badge>
+            case "rejected":
+                return <Badge variant="destructive">Rejected</Badge>
+            case "under_review":
+                return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">Under Review</Badge>
+            default:
+                return <Badge variant="secondary">{status}</Badge>
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight text-gray-900">My Applications</h2>
+                    <p className="text-muted-foreground mt-2">
+                        Manage your assigned workload. Update status and upload results.
+                    </p>
+                </div>
+            </div>
+
+            <div className="rounded-md border bg-white shadow-sm">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-gray-50/50">
+                            <TableHead className="w-[150px]">Application No</TableHead>
+                            <TableHead>Applicant Name</TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead>Accepted Date</TableHead>
+                            <TableHead>Operator Price</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {applications.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <FileText className="h-8 w-8 text-gray-300" />
+                                        <p>No applications assigned to you yet.</p>
+                                        <Button variant="link" asChild className="text-blue-600">
+                                            <a href="/operator/applications/available">Browse Available Applications</a>
+                                        </Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            applications.map((app) => (
+                                <TableRow key={app.id}>
+                                    <TableCell className="font-medium">{app.application_no}</TableCell>
+                                    <TableCell>{app.applicant_name}</TableCell>
+                                    <TableCell>{app.service_name}</TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {app.accepted_at ? new Date(app.accepted_at).toLocaleDateString() : '-'}
+                                    </TableCell>
+                                    <TableCell className="font-medium">₹{app.operator_price || 0}</TableCell>
+                                    <TableCell>{getStatusBadge(app.status)}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleEditClick(app)}
+                                            className="border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                        >
+                                            <Pencil className="h-3 w-3 mr-2" />
+                                            Manage
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Manage Application</DialogTitle>
+                        <DialogDescription>
+                            Update status and upload result documents for <b>{selectedApp?.application_no}</b>.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedApp && (
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <Label className="text-muted-foreground">Applicant</Label>
+                                    <div className="font-medium">{selectedApp.applicant_name}</div>
+                                </div>
+                                <div>
+                                    <Label className="text-muted-foreground">Operator Price</Label>
+                                    <div className="font-medium">₹{selectedApp.operator_price || 0}</div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="status">Application Status</Label>
+                                <Select value={status} onValueChange={(val) => setStatus(val as ApplicationStatus)}>
+                                    <SelectTrigger id="status">
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="under_review">
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="w-4 h-4 text-blue-500" />
+                                                Under Review
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="completed">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                                Completed / Approved
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="rejected">
+                                            <div className="flex items-center gap-2">
+                                                <XCircle className="w-4 h-4 text-red-500" />
+                                                Rejected
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="file">Upload Result Document</Label>
+                                <div className="grid w-full max-w-sm items-center gap-1.5">
+                                    <Input
+                                        id="file"
+                                        type="file"
+                                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                                {selectedApp.document_url && !file && (
+                                    <p className="text-xs text-green-600 flex items-center gap-1">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Document already uploaded
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                "Save Changes"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    )
+}
