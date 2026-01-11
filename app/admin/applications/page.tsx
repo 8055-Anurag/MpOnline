@@ -171,10 +171,10 @@ export default function ApplicationsPage() {
             const fileName = `${id}-${Math.random().toString(36).substring(2)}.${fileExt}`
             const filePath = `${fileName}`
 
-            const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file)
+            const { error: uploadError } = await supabase.storage.from('application-document').upload(filePath, file)
             if (uploadError) throw uploadError
 
-            const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath)
+            const { data: { publicUrl } } = supabase.storage.from('application-document').getPublicUrl(filePath)
 
             const { error: docError } = await supabase.from('application_documents').insert({
                 application_id: id,

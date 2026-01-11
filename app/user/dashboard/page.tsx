@@ -113,67 +113,42 @@ export default function UserDashboard() {
                 </Button>
             </div>
 
-            {/* My Applications Section */}
+            {/* Applications Overview Section */}
             <section>
-                <div className="flex items-center gap-2 mb-6">
-                    <h2 className="text-2xl font-bold tracking-tight text-gray-900">My Applications</h2>
-                </div>
-
-                {applications.length === 0 ? (
-                    <div className="text-center p-12 border rounded-xl bg-muted/10 border-dashed">
-                        <p className="text-muted-foreground">You haven't applied for any services yet.</p>
+                <Card className="bg-blue-50/50 border-blue-100 overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                        <FileText className="w-24 h-24 text-blue-900" />
                     </div>
-                ) : (
-                    <div className="grid gap-6">
-                        {applications.map((app: UserApplication) => (
-                            <Card key={app.id} className="overflow-hidden border-l-4 border-l-primary">
-                                <CardContent className="p-6">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-3">
-                                                <h3 className="font-bold text-lg">{app.service_name}</h3>
-                                                {getStatusBadge(app.status)}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                                <span>App No: <span className="font-mono text-gray-700">{app.application_no}</span></span>
-                                                <span>•</span>
-                                                <span>Applied on {new Date(app.created_at).toLocaleDateString()}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-3">
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" className="gap-2">
-                                                        <FileText className="h-4 w-4" />
-                                                        Documents
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Application Documents</DialogTitle>
-                                                        <DialogDescription>
-                                                            View and download documents for application {app.application_no}
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="mt-4">
-                                                        <ApplicationDocuments applicationId={app.id} />
-                                                    </div>
-                                                </DialogContent>
-                                            </Dialog>
-
-                                            {(app.status === 'completed' || app.status === 'approved') && (
-                                                <Button className="bg-green-600 hover:bg-green-700">
-                                                    Download Receipt
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-blue-700" />
+                            My Applications
+                        </CardTitle>
+                        <CardDescription>
+                            Track the status of your submitted service requests and download processed documents.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-4">
+                            <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 min-w-[120px] text-center">
+                                <span className="block text-2xl font-bold text-blue-700">{applications.length}</span>
+                                <span className="text-xs text-muted-foreground uppercase tracking-wider">Total Apps</span>
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm text-gray-600 mb-4">
+                                    {applications.length === 0
+                                        ? "You haven't submitted any applications yet."
+                                        : `You have ${applications.length} application(s) in progress or completed.`}
+                                </p>
+                                <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                                    <Link href="/user/applications">
+                                        View All Applications <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </section>
 
             <Separator />

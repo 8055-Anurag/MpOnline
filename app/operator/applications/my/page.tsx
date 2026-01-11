@@ -115,13 +115,13 @@ export default function MyApplicationsPage() {
                 const filePath = `${fileName}`
 
                 const { error: uploadError } = await supabase.storage
-                    .from('documents')
+                    .from('application-document')
                     .upload(filePath, file)
 
                 if (uploadError) throw uploadError
 
                 const { data: urlData } = supabase.storage
-                    .from('documents')
+                    .from('application-document')
                     .getPublicUrl(filePath)
 
                 publicUrl = urlData.publicUrl
