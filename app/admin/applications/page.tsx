@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Loader2, Upload, FileText, CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, DollarSign } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Search, Loader2, Upload, FileText, CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, DollarSign, ExternalLink, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +32,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { ApplicationStatus } from "@/types/database"
+import { ApplicationDocuments } from "@/components/application-documents"
 
 // Updated Types
 type Application = {
@@ -58,6 +59,7 @@ const statusOptions = [
 
 export default function ApplicationsPage() {
     const [applications, setApplications] = useState<Application[]>([])
+    const [refreshTrigger, setRefreshTrigger] = useState(0)
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
     const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -90,7 +92,7 @@ export default function ApplicationsPage() {
 
             if (error) throw error
 
-            setApplications(data as Application[] || [])
+            setApplications((data as Application[]) || [])
         } catch (error: any) {
             console.error('Error fetching applications:', error)
             // Mock data fallback for UI demo if DB fields missing
@@ -143,12 +145,12 @@ export default function ApplicationsPage() {
     const handleStatusChange = async (id: string, newStatus: string) => {
         try {
             // Optimistic Update
-            setApplications(apps => apps.map(app =>
+            setApplications((apps: Application[]) => apps.map((app: Application) =>
                 app.id === id ? { ...app, status: newStatus as ApplicationStatus } : app
             ))
 
-            const { error } = await (supabase
-                .from('applications') as any)
+            const { error } = await supabase
+                .from('applications')
                 .update({ status: newStatus as ApplicationStatus })
                 .eq('id', id)
 
@@ -174,13 +176,16 @@ export default function ApplicationsPage() {
 
             const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath)
 
-            const { error: updateError } = await (supabase.from('applications') as any)
-                .update({ document_url: publicUrl, status: 'approved' })
-                .eq('id', id)
-            if (updateError) throw updateError
+            const { error: docError } = await supabase.from('application_documents').insert({
+                application_id: id,
+                document_url: publicUrl,
+                document_type: 'result_doc'
+            })
+            if (docError) throw docError
 
-            setApplications(apps => apps.map(app => app.id === id ? { ...app, document_url: publicUrl, status: "approved" } : app))
-            toast({ title: "Document Uploaded" })
+            setApplications((apps: Application[]) => apps.map((app: Application) => app.id === id ? { ...app, status: "approved" as ApplicationStatus } : app))
+            setRefreshTrigger((prev: number) => prev + 1)
+            toast({ title: "Document Uploaded & Saved to New Table" })
         } catch (error) {
             toast({ title: "Upload Failed", variant: "destructive" })
         } finally {
@@ -193,11 +198,11 @@ export default function ApplicationsPage() {
         if (!relistId) return
         try {
             // Optimistic
-            setApplications(apps => apps.map(app =>
-                app.id === relistId ? { ...app, operator_id: null, accepted_at: null, status: "submitted" } : app
+            setApplications((apps: Application[]) => apps.map((app: Application) =>
+                app.id === relistId ? { ...app, operator_id: null, accepted_at: null, status: "submitted" as ApplicationStatus } : app
             ))
 
-            const { error } = await (supabase.from('applications') as any)
+            const { error } = await supabase.from('applications')
                 .update({ operator_id: null, accepted_at: null, status: 'submitted' })
                 .eq('id', relistId)
 
@@ -224,11 +229,11 @@ export default function ApplicationsPage() {
         if (isNaN(priceVal)) return
 
         try {
-            setApplications(apps => apps.map(app =>
+            setApplications((apps: Application[]) => apps.map((app: Application) =>
                 app.id === priceEditId ? { ...app, price: priceVal } : app
             ))
 
-            const { error } = await (supabase.from('applications') as any)
+            const { error } = await supabase.from('applications')
                 .update({ price: priceVal })
                 .eq('id', priceEditId)
 
@@ -402,6 +407,30 @@ export default function ApplicationsPage() {
                                                             <RefreshCw className="h-4 w-4" />
                                                         </Button>
                                                     )}
+
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                                                title="View Documents"
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent>
+                                                            <DialogHeader>
+                                                                <DialogTitle>Application Documents</DialogTitle>
+                                                                <DialogDescription>
+                                                                    Documents for {app.application_no}
+                                                                </DialogDescription>
+                                                            </DialogHeader>
+                                                            <div className="mt-4">
+                                                                <ApplicationDocuments applicationId={app.id} refreshTrigger={refreshTrigger} />
+                                                            </div>
+                                                        </DialogContent>
+                                                    </Dialog>
 
                                                     <div className="relative">
                                                         <input

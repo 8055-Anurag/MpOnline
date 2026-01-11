@@ -7,13 +7,15 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 
 type User = {
     id: string
     full_name: string
+    email: string
     mobile: string | null
+    role: string
     is_active: boolean
     created_at: string
 }
@@ -88,6 +90,7 @@ export default function ManageUsersPage() {
 
     const filteredUsers = users.filter((user) =>
         user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (user.mobile && user.mobile.includes(searchQuery))
     )
 
@@ -125,8 +128,9 @@ export default function ManageUsersPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Full Name</TableHead>
+                            <TableHead>User Information</TableHead>
                             <TableHead>Mobile</TableHead>
+                            <TableHead>Role</TableHead>
                             <TableHead>Joined Date</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Actions</TableHead>
@@ -142,18 +146,26 @@ export default function ManageUsersPage() {
                         ) : (
                             filteredUsers.map((user) => (
                                 <TableRow key={user.id}>
-                                    <TableCell className="font-medium text-blue-900">
-                                        {user.full_name}
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-blue-900">{user.full_name}</span>
+                                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         {user.mobile || "N/A"}
                                     </TableCell>
                                     <TableCell>
+                                        <Badge variant="outline" className="capitalize">
+                                            {user.role || 'user'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
                                         {format(new Date(user.created_at), "PPP")}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant={user.is_active ? "default" : "destructive"}>
-                                            {user.is_active ? "Active" : "Banned"}
+                                        <Badge variant={user.is_active ? "default" : "secondary"} className={!user.is_active ? "bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200" : ""}>
+                                            {user.is_active ? "Approved" : "Pending Approval"}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
@@ -163,7 +175,7 @@ export default function ManageUsersPage() {
                                                 onCheckedChange={() => toggleUserStatus(user.id, user.is_active)}
                                             />
                                             <span className="text-sm text-muted-foreground">
-                                                {user.is_active ? "Access Granted" : "Access Revoked"}
+                                                {user.is_active ? "Approved" : "Approve"}
                                             </span>
                                         </div>
                                     </TableCell>

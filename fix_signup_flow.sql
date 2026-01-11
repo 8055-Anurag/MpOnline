@@ -43,13 +43,16 @@ BEGIN
       COALESCE(new.raw_user_meta_data->>'full_name', ''),
       new.raw_user_meta_data->>'mobile',
       user_role,
-      TRUE -- Users are active by default (after email confirmation)
+      FALSE -- Users now start as inactive (pending approval)
     );
   END IF;
 
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2b. Ensure table default matches
+ALTER TABLE public.users ALTER COLUMN is_active SET DEFAULT false;
 
 -- 3. Re-create the trigger (drops existing one to be safe)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;

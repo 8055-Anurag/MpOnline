@@ -25,3 +25,19 @@ CREATE POLICY "Users can update own profile"
 ON public.users 
 FOR UPDATE 
 USING (auth.uid() = id);
+
+-- 5. ADMIN POLICIES: Allow admins to manage all users
+-- We use a security definer function to avoid infinite recursion
+CREATE OR REPLACE FUNCTION public.is_admin() 
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+DROP POLICY IF EXISTS "Admins can manage all users" ON public.users;
+CREATE POLICY "Admins can manage all users" 
+ON public.users 
+FOR ALL 
+USING (public.is_admin());

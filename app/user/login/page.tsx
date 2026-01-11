@@ -68,7 +68,7 @@ export default function UserLoginPage() {
                     setError("Access denied. Invalid user role.")
                 } else if (!userRecord.is_active) {
                     await signOut()
-                    setError("Your account has been deactivated. Please contact support.")
+                    setError("Your account is pending approval by an admin. Please check back later.")
                 } else {
                     router.push("/user/dashboard")
                 }

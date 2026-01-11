@@ -265,13 +265,15 @@ export interface Database {
                 Relationships: []
             }
             users: {
-                id: string
-                full_name: string
-                email: string
-                mobile: string | null
-                role: 'user' | 'admin' | 'operator'
-                is_active: boolean
-                created_at: string
+                Row: {
+                    id: string
+                    full_name: string
+                    email: string
+                    mobile: string | null
+                    role: 'user' | 'admin' | 'operator'
+                    is_active: boolean
+                    created_at: string
+                }
                 Insert: {
                     id: string
                     full_name: string
@@ -326,6 +328,37 @@ export interface Database {
                     updated_at?: string
                 }
                 Relationships: []
+            }
+            application_documents: {
+                Row: {
+                    id: string
+                    application_id: string
+                    document_url: string
+                    document_type: string | null
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    application_id: string
+                    document_url: string
+                    document_type?: string | null
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    application_id?: string
+                    document_url?: string
+                    document_type?: string | null
+                    created_at?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "application_documents_application_id_fkey"
+                        columns: ["application_id"]
+                        referencedRelation: "applications"
+                        referencedColumns: ["id"]
+                    }
+                ]
             }
         }
         Views: {

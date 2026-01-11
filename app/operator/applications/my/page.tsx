@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
     Table,
     TableBody,
@@ -29,11 +29,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Pencil, Upload, FileText, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { Loader2, Pencil, Upload, FileText, CheckCircle2, XCircle, Clock, Eye } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
-import { ApplicationStatus } from "@/types/database" // Ensure this type is exported or redefine
+import { ApplicationStatus } from "@/types/database"
+import { ApplicationDocuments } from "@/components/application-documents"
 
 type Application = {
     id: string
@@ -125,19 +127,29 @@ export default function MyApplicationsPage() {
                 publicUrl = urlData.publicUrl
             }
 
-            // 2. Update Application Record
-            const { error: updateError } = await (supabase.from('applications') as any)
+            if (!publicUrl) {
+                throw new Error("No document URL generated")
+            }
+
+            // 2. Insert into document table
+            const { error: docError } = await supabase.from('application_documents').insert({
+                application_id: selectedApp.id,
+                document_url: publicUrl,
+                document_type: 'result_doc'
+            })
+            if (docError) throw docError
+
+            // 3. Update Application Record status
+            const { error: updateError } = await supabase.from('applications')
                 .update({
                     status: status,
-                    document_url: publicUrl,
-                    // If marking as completed and wasn't before? Optional logic.
                 })
                 .eq('id', selectedApp.id)
 
             if (updateError) throw updateError
 
             // 3. Update Local State
-            setApplications(prev => prev.map(app =>
+            setApplications((prev: Application[]) => prev.map((app: Application) =>
                 app.id === selectedApp.id
                     ? { ...app, status: status, document_url: publicUrl }
                     : app
@@ -306,16 +318,28 @@ export default function MyApplicationsPage() {
                                     <Input
                                         id="file"
                                         type="file"
-                                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFile(e.target.files?.[0] || null)}
                                         disabled={isSaving}
                                     />
                                 </div>
                                 {selectedApp.document_url && !file && (
                                     <p className="text-xs text-green-600 flex items-center gap-1">
                                         <CheckCircle2 className="h-3 w-3" />
-                                        Document already uploaded
+                                        Legacy document exists
                                     </p>
                                 )}
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                                <Label className="text-sm font-semibold flex items-center gap-2">
+                                    <Eye className="h-4 w-4" />
+                                    Current Documents
+                                </Label>
+                                <div className="max-h-[200px] overflow-y-auto pr-2">
+                                    <ApplicationDocuments applicationId={selectedApp.id} />
+                                </div>
                             </div>
                         </div>
                     )}

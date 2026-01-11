@@ -57,8 +57,7 @@ const navCategories: NavCategory[] = [
     items: [
       { title: "Operator Requests", href: "/admin/operator-requests" },
       { title: "Operators List", href: "/admin/operators" },
-      { title: "Operator Applications", href: "/admin/operator-applications" },
-      { title: "Relist Applications", href: "/admin/applications" }, // Using main apps page for management
+      { title: "Manage Applications", href: "/admin/applications" },
     ]
   },
   {
@@ -66,10 +65,7 @@ const navCategories: NavCategory[] = [
     icon: Users,
     items: [
       { title: "Users List", href: "/admin/users" },
-      { title: "User Applications", href: "/admin/user-applications" },
       { title: "Manage User Services", href: "/admin/user-services" },
-      { title: "User Access", href: "/admin/user-access" },
-      { title: "Support", href: "/admin/support" },
     ]
   }
 ]

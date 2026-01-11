@@ -70,7 +70,8 @@ export default function UserRegisterPage() {
                     data: {
                         full_name: formData.fullName,
                         mobile: formData.mobile,
-                        role: 'user' // Explicitly setting user role
+                        role: 'user', // Explicitly setting user role
+                        is_active: false // New users start as inactive (pending approval)
                     }
                 }
             })
