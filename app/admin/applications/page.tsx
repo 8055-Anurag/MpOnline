@@ -67,6 +67,12 @@ export default function ApplicationsPage() {
     const [priceEditId, setPriceEditId] = useState<string | null>(null)
     const [newPrice, setNewPrice] = useState<string>("")
 
+    // For Complete Application Dialog
+    const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
+    const [completingApp, setCompletingApp] = useState<Application | null>(null)
+    const [completeFile, setCompleteFile] = useState<File | null>(null)
+    const [isCompleting, setIsCompleting] = useState(false)
+
     // For Relist Dialog
     const [relistId, setRelistId] = useState<string | null>(null)
 
@@ -143,6 +149,16 @@ export default function ApplicationsPage() {
 
     // Status Update
     const handleStatusChange = async (id: string, newStatus: string) => {
+        if (newStatus === 'completed') {
+            const app = applications.find(a => a.id === id)
+            if (app) {
+                setCompletingApp(app)
+                setCompleteFile(null)
+                setCompleteDialogOpen(true)
+            }
+            return
+        }
+
         try {
             // Optimistic Update
             setApplications((apps: Application[]) => apps.map((app: Application) =>
@@ -166,30 +182,95 @@ export default function ApplicationsPage() {
     // File Upload
     const handleFileUpload = async (id: string, file: File) => {
         setUploadingId(id)
+        console.log("Starting upload for application:", id, "File:", file.name)
         try {
             const fileExt = file.name.split('.').pop()
             const fileName = `${id}-${Math.random().toString(36).substring(2)}.${fileExt}`
             const filePath = `${fileName}`
 
-            const { error: uploadError } = await supabase.storage.from('application-document').upload(filePath, file)
-            if (uploadError) throw uploadError
+            console.log("Uploading to bucket 'application-document' at path:", filePath)
+            const { data: uploadData, error: uploadError } = await supabase.storage.from('application-document').upload(filePath, file)
+
+            if (uploadError) {
+                console.error("Supabase Storage Upload Error:", uploadError)
+                throw uploadError
+            }
+            console.log("Upload successful, data:", uploadData)
 
             const { data: { publicUrl } } = supabase.storage.from('application-document').getPublicUrl(filePath)
+            console.log("Generated public URL:", publicUrl)
 
             const { error: docError } = await supabase.from('application_documents').insert({
                 application_id: id,
                 document_url: publicUrl,
                 document_type: 'result_doc'
             })
-            if (docError) throw docError
+
+            if (docError) {
+                console.error("Database Insert Error (application_documents):", docError)
+                throw docError
+            }
 
             setApplications((apps: Application[]) => apps.map((app: Application) => app.id === id ? { ...app, status: "approved" as ApplicationStatus } : app))
             setRefreshTrigger((prev: number) => prev + 1)
-            toast({ title: "Document Uploaded & Saved to New Table" })
-        } catch (error) {
-            toast({ title: "Upload Failed", variant: "destructive" })
+            toast({ title: "Document Uploaded & Saved" })
+        } catch (error: any) {
+            console.error("Final catch in handleFileUpload:", error)
+            toast({
+                title: "Upload Failed",
+                description: error.message || "An unknown error occurred",
+                variant: "destructive"
+            })
         } finally {
             setUploadingId(null)
+        }
+    }
+
+    const handleUploadAndComplete = async () => {
+        if (!completingApp || !completeFile) {
+            toast({ title: "File Required", description: "Please upload the final document to complete the application.", variant: "destructive" })
+            return
+        }
+
+        setIsCompleting(true)
+        try {
+            const fileExt = completeFile.name.split('.').pop()
+            const fileName = `${completingApp.id}-final-${Math.random().toString(36).substring(2)}.${fileExt}`
+            const filePath = `${fileName}`
+
+            // 1. Upload to storage
+            const { error: uploadError } = await supabase.storage.from('application-document').upload(filePath, completeFile)
+            if (uploadError) throw uploadError
+
+            const { data: { publicUrl } } = supabase.storage.from('application-document').getPublicUrl(filePath)
+
+            // 2. Insert into application_documents
+            const { error: docError } = await supabase.from('application_documents').insert({
+                application_id: completingApp.id,
+                document_url: publicUrl,
+                document_type: 'result_doc'
+            })
+            if (docError) throw docError
+
+            // 3. Update application status
+            const { error: statusError } = await supabase
+                .from('applications')
+                .update({ status: 'completed' as ApplicationStatus })
+                .eq('id', completingApp.id)
+
+            if (statusError) throw statusError
+
+            setApplications((apps) => apps.map(app =>
+                app.id === completingApp.id ? { ...app, status: 'completed' as ApplicationStatus } : app
+            ))
+
+            toast({ title: "Application Completed", description: "Final document uploaded and status updated to completed." })
+            setCompleteDialogOpen(false)
+        } catch (error: any) {
+            console.error("Error in handleUploadAndComplete:", error)
+            toast({ title: "Verification Failed", description: error.message || "An error occurred", variant: "destructive" })
+        } finally {
+            setIsCompleting(false)
         }
     }
 
@@ -469,6 +550,79 @@ export default function ApplicationsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-bold">Complete Application</DialogTitle>
+                        <DialogDescription className="text-base mt-2">
+                            To mark this application as <span className="font-semibold text-gray-900">Approved</span>, you must upload the final output document (e.g., Certificate, Visa, Letter).
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold flex items-center gap-1">
+                                Upload Final Document <span className="text-red-500">*</span>
+                            </label>
+                            <div
+                                className={`mt-2 border-2 border-dashed rounded-xl p-8 transition-colors text-center ${completeFile ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-blue-400'}`}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault()
+                                    const file = e.dataTransfer.files?.[0]
+                                    if (file) setCompleteFile(file)
+                                }}
+                            >
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className={`p-4 rounded-full ${completeFile ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                        <FileText className={`h-8 w-8 ${completeFile ? 'text-green-600' : 'text-gray-400'}`} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-center gap-1 text-sm">
+                                            <label htmlFor="final-upload" className="font-semibold text-blue-600 cursor-pointer hover:underline">
+                                                Upload a file
+                                            </label>
+                                            <span className="text-muted-foreground">or drag and drop</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 10MB</p>
+                                    </div>
+                                    {completeFile && (
+                                        <div className="mt-2 text-sm font-medium text-green-700 flex items-center gap-2">
+                                            <CheckCircle className="h-4 w-4" />
+                                            {completeFile.name}
+                                        </div>
+                                    )}
+                                    <input
+                                        id="final-upload"
+                                        type="file"
+                                        className="hidden"
+                                        onChange={(e) => setCompleteFile(e.target.files?.[0] || null)}
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setCompleteDialogOpen(false)} disabled={isCompleting}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleUploadAndComplete}
+                            disabled={!completeFile || isCompleting}
+                            className="bg-green-700 hover:bg-green-800 text-white min-w-[160px]"
+                        >
+                            {isCompleting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                "Upload & Complete"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog open={!!relistId} onOpenChange={() => setRelistId(null)}>
                 <AlertDialogContent>

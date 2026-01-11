@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Pencil, Upload, FileText, CheckCircle2, XCircle, Clock, Eye } from "lucide-react"
+import { Loader2, Pencil, Upload, FileText, CheckCircle2, XCircle, Clock, Eye, AlertCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
 import { ApplicationStatus } from "@/types/database"
@@ -262,31 +262,31 @@ export default function MyApplicationsPage() {
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>Manage Application</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="text-2xl font-bold">Manage Application</DialogTitle>
+                        <DialogDescription className="text-base mt-2">
                             Update status and upload result documents for <b>{selectedApp?.application_no}</b>.
                         </DialogDescription>
                     </DialogHeader>
 
                     {selectedApp && (
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-6 py-4">
+                            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border">
                                 <div>
-                                    <Label className="text-muted-foreground">Applicant</Label>
-                                    <div className="font-medium">{selectedApp.applicant_name}</div>
+                                    <Label className="text-muted-foreground text-xs uppercase tracking-wider">Applicant</Label>
+                                    <div className="font-semibold text-gray-900">{selectedApp.applicant_name}</div>
                                 </div>
                                 <div>
-                                    <Label className="text-muted-foreground">Operator Price</Label>
-                                    <div className="font-medium">₹{selectedApp.operator_price || 0}</div>
+                                    <Label className="text-muted-foreground text-xs uppercase tracking-wider">Operator Price</Label>
+                                    <div className="font-semibold text-green-700">₹{selectedApp.operator_price || 0}</div>
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="status">Application Status</Label>
+                            <div className="space-y-3">
+                                <Label htmlFor="status" className="font-semibold">Application Status</Label>
                                 <Select value={status} onValueChange={(val) => setStatus(val as ApplicationStatus)}>
-                                    <SelectTrigger id="status">
+                                    <SelectTrigger id="status" className="h-10">
                                         <SelectValue placeholder="Select status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -312,20 +312,52 @@ export default function MyApplicationsPage() {
                                 </Select>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="file">Upload Result Document</Label>
-                                <div className="grid w-full max-w-sm items-center gap-1.5">
-                                    <Input
-                                        id="file"
-                                        type="file"
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFile(e.target.files?.[0] || null)}
-                                        disabled={isSaving}
-                                    />
+                            <div className="space-y-3">
+                                <Label className="font-semibold">
+                                    {status === 'completed' ? 'Upload Final Document *' : 'Upload Document (Optional)'}
+                                </Label>
+                                <div
+                                    className={`border-2 border-dashed rounded-xl p-6 transition-colors text-center ${file ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-blue-400'}`}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault()
+                                        const droppedFile = e.dataTransfer.files?.[0]
+                                        if (droppedFile) setFile(droppedFile)
+                                    }}
+                                >
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className={`p-3 rounded-full ${file ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                            <Upload className={`h-6 w-6 ${file ? 'text-green-600' : 'text-gray-400'}`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-center gap-1 text-sm">
+                                                <label htmlFor="op-file-upload" className="font-semibold text-blue-600 cursor-pointer hover:underline">
+                                                    Upload a file
+                                                </label>
+                                                <span className="text-muted-foreground">or drag and drop</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">PDF, JPG, PNG up to 10MB</p>
+                                        </div>
+                                        {file && (
+                                            <div className="mt-2 text-sm font-medium text-green-700 flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                {file.name}
+                                            </div>
+                                        )}
+                                        <input
+                                            id="op-file-upload"
+                                            type="file"
+                                            className="hidden"
+                                            onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            disabled={isSaving}
+                                        />
+                                    </div>
                                 </div>
-                                {selectedApp.document_url && !file && (
-                                    <p className="text-xs text-green-600 flex items-center gap-1">
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Legacy document exists
+                                {status === 'completed' && !file && (
+                                    <p className="text-xs text-red-500 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        A final document is required to complete the application.
                                     </p>
                                 )}
                             </div>
@@ -337,25 +369,29 @@ export default function MyApplicationsPage() {
                                     <Eye className="h-4 w-4" />
                                     Current Documents
                                 </Label>
-                                <div className="max-h-[200px] overflow-y-auto pr-2">
+                                <div className="max-h-[150px] overflow-y-auto pr-2 border rounded-md p-2 bg-gray-50/30">
                                     <ApplicationDocuments applicationId={selectedApp.id} />
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <DialogFooter>
+                    <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
                             Cancel
                         </Button>
-                        <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                        <Button
+                            onClick={handleSave}
+                            disabled={isSaving || (status === 'completed' && !file)}
+                            className={`${status === 'completed' ? 'bg-green-700 hover:bg-green-800' : 'bg-blue-600 hover:bg-blue-700'} text-white min-w-[140px]`}
+                        >
                             {isSaving ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Saving...
                                 </>
                             ) : (
-                                "Save Changes"
+                                status === 'completed' ? "Upload & Complete" : "Save Changes"
                             )}
                         </Button>
                     </DialogFooter>

@@ -135,7 +135,7 @@ export default function ServiceDetailPage() {
                                 You will be redirected to a secure Google Form to complete your application.
                             </p>
                             <Button className="w-full bg-blue-600 hover:bg-blue-700" asChild>
-                                <a href={getProcessedUrl()} target="_blank" rel="noopener noreferrer">
+                                <a href={getProcessedUrl()} rel="noopener noreferrer">
                                     Proceed to Application <ExternalLink className="ml-2 h-4 w-4" />
                                 </a>
                             </Button>

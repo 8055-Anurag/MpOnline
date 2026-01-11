@@ -6,8 +6,9 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Loader2, FileText, ArrowLeft } from "lucide-react"
+import { Loader2, FileText, ArrowLeft, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ApplicationDocuments } from "@/components/application-documents"
 
@@ -22,6 +23,7 @@ type UserApplication = {
 export default function UserApplicationsPage() {
     const { user, loading: authLoading } = useAuth()
     const [applications, setApplications] = useState<UserApplication[]>([])
+    const [searchQuery, setSearchQuery] = useState("")
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -63,6 +65,29 @@ export default function UserApplicationsPage() {
         }
     }
 
+    const filteredApplications = applications.filter(app =>
+        app.application_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        app.service_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+
+    const handleDownloadResult = async (applicationId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('application_documents')
+                .select('document_url')
+                .eq('application_id', applicationId)
+                .eq('document_type', 'result_doc')
+                .single()
+
+            if (error) throw error
+            if (data?.document_url) {
+                window.open(data.document_url, '_blank')
+            }
+        } catch (error) {
+            console.error('Error downloading result:', error)
+        }
+    }
+
     if (authLoading || loading) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -94,6 +119,16 @@ export default function UserApplicationsPage() {
                 </div>
             </div>
 
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Search by application number or service name..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+
             {applications.length === 0 ? (
                 <Card className="text-center p-12 border-dashed">
                     <CardContent className="space-y-4">
@@ -103,9 +138,15 @@ export default function UserApplicationsPage() {
                         </Button>
                     </CardContent>
                 </Card>
+            ) : filteredApplications.length === 0 ? (
+                <Card className="text-center p-12 border-dashed">
+                    <CardContent>
+                        <p className="text-muted-foreground">No applications found matching your search.</p>
+                    </CardContent>
+                </Card>
             ) : (
                 <div className="grid gap-4">
-                    {applications.map((app) => (
+                    {filteredApplications.map((app) => (
                         <Card key={app.id} className="hover:shadow-md transition-shadow">
                             <CardContent className="p-6">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -137,13 +178,17 @@ export default function UserApplicationsPage() {
                                                     </DialogDescription>
                                                 </DialogHeader>
                                                 <div className="mt-4">
-                                                    <ApplicationDocuments applicationId={app.id} />
+                                                    <ApplicationDocuments applicationId={app.id} excludeResultDoc={true} />
                                                 </div>
                                             </DialogContent>
                                         </Dialog>
 
                                         {(app.status === 'completed' || app.status === 'approved') && (
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                                            <Button
+                                                size="sm"
+                                                className="bg-green-600 hover:bg-green-700"
+                                                onClick={() => handleDownloadResult(app.id)}
+                                            >
                                                 Download Result
                                             </Button>
                                         )}

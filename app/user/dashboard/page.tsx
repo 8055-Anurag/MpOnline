@@ -6,8 +6,9 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Loader2, ArrowRight, FileText, Download, ExternalLink, Clock, CheckCircle2, XCircle } from "lucide-react"
+import { Loader2, ArrowRight, FileText, Download, ExternalLink, Clock, CheckCircle2, XCircle, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ApplicationDocuments } from "@/components/application-documents"
@@ -33,6 +34,7 @@ export default function UserDashboard() {
     const { user, loading: authLoading } = useAuth()
     const [services, setServices] = useState<UserService[]>([])
     const [applications, setApplications] = useState<UserApplication[]>([])
+    const [searchQuery, setSearchQuery] = useState("")
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -67,6 +69,11 @@ export default function UserDashboard() {
         }
         fetchData()
     }, [user])
+
+    const filteredServices = services.filter(service =>
+        service.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (service.description && service.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
 
     if (authLoading || loading) {
         return (
@@ -155,20 +162,35 @@ export default function UserDashboard() {
 
             {/* Exclusive Services Section */}
             <section>
-                <div className="flex items-center gap-2 mb-6">
-                    <h2 className="text-2xl font-bold tracking-tight">Available Exclusive Services</h2>
-                    <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
-                        User Only
-                    </span>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-2xl font-bold tracking-tight">Available Exclusive Services</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                            User Only
+                        </span>
+                    </div>
+                    <div className="relative w-full md:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search services..."
+                            className="pl-10"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 {services.length === 0 ? (
                     <div className="text-center p-12 border rounded-lg bg-muted/20">
                         <p className="text-muted-foreground">No exclusive services are available at the moment.</p>
                     </div>
+                ) : filteredServices.length === 0 ? (
+                    <div className="text-center p-12 border rounded-lg bg-muted/20">
+                        <p className="text-muted-foreground">No services found matching your search.</p>
+                    </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {services.map((service: UserService) => (
+                        {filteredServices.map((service: UserService) => (
                             <Card key={service.id} className="flex flex-col hover:shadow-lg transition-all hover:-translate-y-1">
                                 <CardHeader>
                                     <CardTitle>{service.title}</CardTitle>

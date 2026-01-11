@@ -16,9 +16,10 @@ type Document = {
 interface ApplicationDocumentsProps {
     applicationId: string
     refreshTrigger?: number
+    excludeResultDoc?: boolean
 }
 
-export function ApplicationDocuments({ applicationId, refreshTrigger = 0 }: ApplicationDocumentsProps) {
+export function ApplicationDocuments({ applicationId, refreshTrigger = 0, excludeResultDoc = false }: ApplicationDocumentsProps) {
     const [documents, setDocuments] = useState<Document[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -46,6 +47,10 @@ export function ApplicationDocuments({ applicationId, refreshTrigger = 0 }: Appl
         }
     }, [applicationId, refreshTrigger])
 
+    const filteredDocs = excludeResultDoc
+        ? documents.filter(doc => doc.document_type !== 'result_doc')
+        : documents
+
     if (loading) {
         return (
             <div className="flex items-center justify-center p-4">
@@ -54,7 +59,7 @@ export function ApplicationDocuments({ applicationId, refreshTrigger = 0 }: Appl
         )
     }
 
-    if (documents.length === 0) {
+    if (filteredDocs.length === 0) {
         return (
             <div className="text-center p-4 border rounded-md border-dashed text-muted-foreground text-sm">
                 No documents found.
@@ -72,7 +77,7 @@ export function ApplicationDocuments({ applicationId, refreshTrigger = 0 }: Appl
 
     return (
         <div className="space-y-3">
-            {documents.map((doc: Document) => (
+            {filteredDocs.map((doc: Document) => (
                 <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div className="bg-primary/10 p-2 rounded-md">
